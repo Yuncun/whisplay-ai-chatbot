@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -57,6 +57,11 @@ camera_thread = None
 clients = {}
 status_icon_factories = []
 
+# Storymode animation
+storymode_active = False
+_storymode_thread = None
+STORYMODE_SPRITES_DIR = "/home/pi/sprites/elf-girl-graph"
+
 # Quad-tap mode cycling
 _tap_times = []
 _last_press_time = 0
@@ -68,6 +73,178 @@ _mode_led_colors = {
     "claudiugh": (255, 0, 0),
     "helen": (255, 0, 255),
 }
+
+
+import random as _random
+
+
+class StorymodePlayer:
+    """Plays pose graph animations on the LCD when helen mode is active."""
+
+    def __init__(self, whisplay_board, sprites_dir):
+        self.board = whisplay_board
+        self.sprites_dir = sprites_dir
+        self.running = False
+        self.graph = None
+        self.outgoing = {}
+        self.incoming = {}
+        self.self_loops = {}
+        self.home_node = None
+        self.fps = 16
+        self._load_graph()
+
+    def _load_graph(self):
+        graph_path = os.path.join(self.sprites_dir, "graph.json")
+        if not os.path.exists(graph_path):
+            print(f"[Storymode] No graph.json at {graph_path}")
+            return
+        with open(graph_path) as f:
+            self.graph = json.load(f)
+        # Build adjacency
+        for eid, edge in self.graph.get("edges", {}).items():
+            src = edge.get("source", "")
+            tgt = edge.get("target", "")
+            if not src or not tgt:
+                continue
+            self.outgoing.setdefault(src, []).append((eid, tgt, edge))
+            self.incoming.setdefault(tgt, []).append((eid, src, edge))
+            if src == tgt:
+                self.self_loops[eid] = edge
+        # Home node
+        if "cc97ae2f" in self.graph.get("nodes", {}):
+            self.home_node = "cc97ae2f"
+        elif self.outgoing:
+            self.home_node = max(self.outgoing, key=lambda k: len(self.outgoing[k]))
+        print(f"[Storymode] Loaded graph: {len(self.graph.get('nodes', {}))} nodes, {len(self.graph.get('edges', {}))} edges")
+
+    def _display_frame(self, img_path):
+        """Load a PNG and push it to the LCD."""
+        if not os.path.exists(img_path):
+            return
+        img = Image.open(img_path).convert("RGBA")
+        # Resize to fill screen (240x280), center vertically
+        img_resized = Image.new("RGBA", (self.board.LCD_WIDTH, self.board.LCD_HEIGHT), (0, 0, 0, 255))
+        # Center 240x240 sprite in 240x280 screen (20px top offset)
+        y_offset = (self.board.LCD_HEIGHT - img.size[1]) // 2
+        img_resized.paste(img, (0, max(0, y_offset)))
+        rgb565 = ImageUtils.image_to_rgb565(img_resized, self.board.LCD_WIDTH, self.board.LCD_HEIGHT)
+        self.board.draw_image(0, 0, self.board.LCD_WIDTH, self.board.LCD_HEIGHT, rgb565)
+
+    def _play_edge(self, edge_id, frame_count):
+        """Play an edge animation. Returns False if stopped."""
+        interval = 1.0 / self.fps
+        edge_dir = os.path.join(self.sprites_dir, "edges", edge_id)
+        for i in range(frame_count):
+            if not self.running:
+                return False
+            self._display_frame(os.path.join(edge_dir, f"{i:03d}.png"))
+            time.sleep(interval)
+        return True
+
+    def _pick_trip(self, current_node):
+        """Pick a random roundtrip from current node."""
+        outs = self.outgoing.get(current_node, [])
+        if not outs:
+            return None
+        roundtrips = []
+        for eid, tgt, edge in outs:
+            if tgt == current_node:
+                continue
+            returns = [(re, re_info) for re, rs, re_info in self.incoming.get(current_node, []) if rs == tgt]
+            if returns:
+                ret = _random.choice(returns)
+                roundtrips.append((eid, tgt, edge, ret[0], ret[1]))
+        if not roundtrips:
+            return None
+        return _random.choice(roundtrips)
+
+    def run(self):
+        """Main animation loop."""
+        if not self.graph or not self.home_node:
+            print("[Storymode] No graph loaded, can't animate")
+            return
+        self.running = True
+        current_node = self.home_node
+        print("[Storymode] Animation started")
+
+        # Find breathing self-loop
+        breathing = [(eid, e) for eid, e in self.self_loops.items()
+                     if "breathing" in e.get("prompt", "").lower()]
+
+        while self.running:
+            # Breathe at home
+            if breathing and current_node == self.home_node:
+                eid, edge = _random.choice(breathing)
+                fc = edge.get("frame_count", 0)
+                if fc > 0:
+                    loops = max(1, int(_random.uniform(0.5, 1.5) * self.fps / fc))
+                    for _ in range(loops):
+                        if not self.running:
+                            break
+                        if not self._play_edge(eid, fc):
+                            break
+            else:
+                # Hold on current pose briefly
+                time.sleep(_random.uniform(0.5, 1.5))
+
+            if not self.running:
+                break
+
+            # Pick a trip
+            trip = self._pick_trip(current_node)
+            if not trip:
+                time.sleep(0.5)
+                continue
+
+            out_eid, dest, out_edge, ret_eid, ret_edge = trip
+            # Play outgoing
+            if not self._play_edge(out_eid, out_edge["frame_count"]):
+                break
+            current_node = dest
+
+            # Hold destination
+            if not self.running:
+                break
+            time.sleep(_random.uniform(0.3, 1.0))
+
+            # Return home
+            if not self.running:
+                break
+            if not self._play_edge(ret_eid, ret_edge["frame_count"]):
+                break
+            current_node = self.home_node
+
+        print("[Storymode] Animation stopped")
+
+    def stop(self):
+        self.running = False
+
+
+def _start_storymode():
+    """Start storymode animation in a background thread."""
+    global storymode_active, _storymode_thread
+    if storymode_active:
+        return
+    storymode_active = True
+    player = StorymodePlayer(whisplay, STORYMODE_SPRITES_DIR)
+    def _run():
+        global storymode_active
+        player.run()
+        storymode_active = False
+    _storymode_thread = threading.Thread(target=_run, daemon=True)
+    _storymode_thread.start()
+    # Store player ref for stopping
+    _start_storymode._player = player
+
+
+def _stop_storymode():
+    """Stop storymode animation."""
+    global storymode_active
+    if not storymode_active:
+        return
+    if hasattr(_start_storymode, '_player'):
+        _start_storymode._player.stop()
+    storymode_active = False
 
 
 def register_status_icon_factory(factory, priority=100):
@@ -100,8 +277,8 @@ class RenderThread(threading.Thread):
 
     def render_frame(self, status, emoji, text, scroll_top, battery_level, battery_color):
         global current_scroll_speed, current_image_path, current_image, camera_mode
-        if camera_mode:
-            return  # Skip rendering if in camera mode
+        if camera_mode or storymode_active:
+            return  # Skip rendering if in camera or storymode
         if current_image_path not in [None, ""]:
             # Try to load image from path
             if current_image is not None:
@@ -485,12 +662,11 @@ def on_button_release():
             print(f"[Mode] Switched to: {_current_mode}")
             toggle_notification = {"event": "guest_mode_toggle", "mode": _current_mode}
             send_to_all_clients(toggle_notification)
-            # Write mode flag file for external animation player
-            try:
-                with open("/tmp/whisplay-mode", "w") as f:
-                    f.write(_current_mode)
-            except Exception:
-                pass
+            # Storymode: helen mode starts animation, anything else stops it
+            if _current_mode == "helen":
+                _start_storymode()
+            else:
+                _stop_storymode()
             threading.Thread(target=_blink_mode_led, args=(_current_mode,), daemon=True).start()
 
 def _blink_mode_led(mode):
