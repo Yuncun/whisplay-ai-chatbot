@@ -194,6 +194,21 @@ export function registerLLMPlugins(): void {
   } as LLMPlugin);
 
   pluginRegistry.register({
+    name: "openclaw",
+    displayName: "OpenClaw Gateway",
+    version: "1.0.0",
+    type: "llm",
+    description: "Direct connection to OpenClaw gateway (agent routing, memory, personality)",
+    activate: () => {
+      const mod = require("../../cloud-api/openclaw/openclaw-llm").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
     name: "image-tool-direct",
     displayName: "Image Tool Direct LLM",
     version: "1.0.0",
