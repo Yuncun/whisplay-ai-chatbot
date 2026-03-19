@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -423,6 +423,8 @@ def update_display_data(status=None, emoji=None, text=None,
     current_text = next_text if text is not None else current_text
     current_battery_level = battery_level if battery_level is not None else current_battery_level
     current_battery_color = battery_color if battery_color is not None else current_battery_color
+    if image_path is not None and image_path != current_image_path:
+        current_image = None  # Force reload when path changes (enables animation)
     current_image_path = image_path if image_path is not None else current_image_path
 
 
