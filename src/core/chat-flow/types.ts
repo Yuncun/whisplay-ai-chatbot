@@ -38,6 +38,7 @@ export interface ChatFlowContext {
   isFromWakeListening: boolean;
   enterMusicAfterAnswer: boolean;
   musicDisplayText: string;
+  currentMode: string;
 
   transitionTo: (flowName: FlowName) => void;
   recognizeAudio: (path: string, isFromAutoListening?: boolean) => Promise<string>;
