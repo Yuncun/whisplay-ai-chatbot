@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -56,6 +56,18 @@ camera_capture_image_path = ""
 camera_thread = None
 clients = {}
 status_icon_factories = []
+
+# Quad-tap mode cycling
+_tap_times = []
+_last_press_time = 0
+_current_mode = "claudia"
+_alt_modes = ["claudiugh", "helen"]
+_alt_index = 0
+_mode_led_colors = {
+    "claudia": (0, 255, 0),
+    "claudiugh": (255, 0, 0),
+    "helen": (255, 0, 255),
+}
 
 
 def register_status_icon_factory(factory, priority=100):
@@ -140,10 +152,12 @@ class RenderThread(threading.Thread):
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
             self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
-            # Version overlay (bottom-right, above rounded corner)
+            # Version + mode overlay (bottom, above rounded corners)
             ver_font = ImageFont.truetype(self.font_path, 10)
             ver_w = ver_font.getlength(VERSION)
             text_draw.text((self.whisplay.LCD_WIDTH - ver_w - whisplay.CornerHeight - 2, text_area_height - whisplay.CornerHeight - 2), VERSION, font=ver_font, fill=(50, 50, 50, 255))
+            # Mode name (bottom-left)
+            text_draw.text((whisplay.CornerHeight + 2, text_area_height - whisplay.CornerHeight - 2), _current_mode, font=ver_font, fill=(80, 80, 80, 255))
             self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
 
         
@@ -439,15 +453,45 @@ def exit_camera_mode():
 
 def on_button_pressed():
     """Function executed when button is pressed"""
+    global _last_press_time
+    _last_press_time = time.time()
     print("[Server] Button pressed")
     notification = {"event": "button_pressed"}
     send_to_all_clients(notification)
 
 def on_button_release():
     """Function executed when button is released"""
+    global _last_press_time, _tap_times, _current_mode, _alt_index
+    press_duration = time.time() - _last_press_time if _last_press_time > 0 else float('inf')
     print("[Server] Button released")
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
+
+    # Quad-tap detection: 4 short presses (<400ms each) within 1.2s
+    if press_duration < 0.4:
+        now = time.time()
+        _tap_times = [t for t in _tap_times if now - t < 1.2]
+        _tap_times.append(now)
+        if len(_tap_times) >= 4:
+            _tap_times = []
+            if _current_mode == "claudia":
+                _current_mode = _alt_modes[_alt_index]
+                _alt_index = (_alt_index + 1) % len(_alt_modes)
+            else:
+                _current_mode = "claudia"
+            print(f"[Mode] Switched to: {_current_mode}")
+            toggle_notification = {"event": "guest_mode_toggle", "mode": _current_mode}
+            send_to_all_clients(toggle_notification)
+            threading.Thread(target=_blink_mode_led, args=(_current_mode,), daemon=True).start()
+
+def _blink_mode_led(mode):
+    """Blink LED 3x in mode color"""
+    color = _mode_led_colors.get(mode, (255, 255, 255))
+    for _ in range(3):
+        whisplay.set_rgb_fade(*color, duration_ms=100)
+        time.sleep(0.2)
+        whisplay.set_rgb_fade(0, 0, 0, duration_ms=100)
+        time.sleep(0.2)
 
 def handle_client(client_socket, addr, whisplay):
     global camera_capture_image_path, camera_mode, camera_thread

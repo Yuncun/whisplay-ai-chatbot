@@ -54,6 +54,7 @@ export class WhisplayDisplay {
   private buttonReleasedCallback: () => void = () => {};
   private buttonDoubleClickCallback: (() => void) | null = null;
   private onCameraCaptureCallback: () => void = () => {};
+  private guestModeToggleCallback: (mode: string) => void = () => {};
   private isReady: Promise<void>;
   private pythonProcess: any; // Placeholder for Python process if needed
   private buttonPressTimeArray: number[] = [];
@@ -233,6 +234,9 @@ export class WhisplayDisplay {
             if (json.event === "camera_capture") {
               this.handleCameraCaptureEvent();
             }
+            if (json.event === "guest_mode_toggle") {
+              this.guestModeToggleCallback(json.mode || "claudia");
+            }
             if (json.event === "exit_camera_mode") {
               this.display({ camera_mode: false });
             }
@@ -270,6 +274,10 @@ export class WhisplayDisplay {
 
   onCameraCapture(callback: () => void): void {
     this.onCameraCaptureCallback = callback;
+  }
+
+  onGuestModeToggle(callback: (mode: string) => void): void {
+    this.guestModeToggleCallback = callback;
   }
 
   private async sendToDisplay(data: string): Promise<void> {
@@ -491,6 +499,8 @@ export const onButtonDoubleClick =
   displayInstance.onButtonDoubleClick.bind(displayInstance);
 export const onCameraCapture =
   displayInstance.onCameraCapture.bind(displayInstance);
+export const onGuestModeToggle =
+  displayInstance.onGuestModeToggle.bind(displayInstance);
 
 function cleanup() {
   console.log("Cleaning up display process before exit...");

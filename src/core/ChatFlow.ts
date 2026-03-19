@@ -51,6 +51,7 @@ class ChatFlow implements ChatFlowContext {
   currentExternalEmoji: string = "";
   stateMachine: FlowStateMachine;
   isFromWakeListening: boolean = false;
+  currentMode: string = "claudia";
 
   constructor(options: { enableCamera?: boolean } = {}) {
     console.log(`[${getCurrentTimeTag()}] ChatBot started.`);
