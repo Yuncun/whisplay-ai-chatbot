@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -170,10 +170,15 @@ class RenderThread(threading.Thread):
         """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
             return
-        # Show controls guide on idle screen
+        # Show clock + IP on idle screen
         if text in ("Long Press the button to say something.",
                      "Long Press the button to say something,\ndouble click to launch camera."):
-            text = "Hold — talk  |  Release — send  |  Press during reply — interrupt  |  3x tap — silent mode"
+            import subprocess as _sp
+            try:
+                _ip = _sp.check_output(["hostname", "-I"], timeout=2).decode().strip().split()[0]
+            except Exception:
+                _ip = ""
+            text = time.strftime("%H:%M") + ("  " + _ip if _ip else "")
         # Use main text font
         font = ImageFont.truetype(self.font_path, 16)
         lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
