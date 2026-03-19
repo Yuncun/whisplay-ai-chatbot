@@ -354,6 +354,7 @@ def update_display_data(status=None, emoji=None, text=None,
     global current_scroll_sync_target_top, current_scroll_sync_speed
     global current_scroll_sync_hold_until
     global current_network_connected, current_rag_icon_visible, current_image_icon_visible, current_transaction_id
+    global current_image
 
     next_text = text
     if text is not None:
