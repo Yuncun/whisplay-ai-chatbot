@@ -73,6 +73,12 @@ const killAllRecordingProcesses = (): void => {
     try {
       child.kill("SIGINT");
     } catch (e) { }
+    // Force-kill after 500ms if SIGINT didn't work (sox can hang on Pi Zero)
+    setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch (e) { }
+    }, 500);
   });
   recordingProcessList.length = 0;
 };
