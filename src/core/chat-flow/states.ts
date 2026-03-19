@@ -244,6 +244,11 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         return;
       }
       ctx.transitionTo("sleep");
+    }).catch((err) => {
+      console.error("ASR error, returning to sleep:", err);
+      if (ctx.currentFlowName === "asr") {
+        ctx.transitionTo("sleep");
+      }
     });
   },
   answer: (ctx: ChatFlowContext) => {
