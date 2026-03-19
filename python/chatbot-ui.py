@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -140,10 +140,10 @@ class RenderThread(threading.Thread):
             text_bg_image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, text_area_height), (0, 0, 0, 255))
             text_draw = ImageDraw.Draw(text_bg_image)
             self.render_main_text(text_bg_image, text_area_height, text_draw, text, current_scroll_speed)
-            # Version overlay (bottom-right, dim)
+            # Version overlay (bottom-right, above rounded corner)
             ver_font = ImageFont.truetype(self.font_path, 10)
             ver_w = ver_font.getlength(VERSION)
-            text_draw.text((self.whisplay.LCD_WIDTH - ver_w - 4, text_area_height - 14), VERSION, font=ver_font, fill=(50, 50, 50, 255))
+            text_draw.text((self.whisplay.LCD_WIDTH - ver_w - whisplay.CornerHeight - 2, text_area_height - whisplay.CornerHeight - 2), VERSION, font=ver_font, fill=(50, 50, 50, 255))
             self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
 
         
