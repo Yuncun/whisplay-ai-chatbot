@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -26,9 +26,9 @@ from image_icon import ImageStatusIcon
 scroll_thread = None
 scroll_stop_event = threading.Event()
 
-status_font_size=20
-emoji_font_size=40
-battery_font_size=13
+status_font_size=16
+emoji_font_size=36
+battery_font_size=12
 
 # Global variables
 current_status = "Hello"
@@ -71,7 +71,7 @@ class RenderThread(threading.Thread):
         # Clear logo after 1 second and start running loop
         time.sleep(1)
         self.running = True
-        self.main_text_font = ImageFont.truetype(self.font_path, 20)
+        self.main_text_font = ImageFont.truetype(self.font_path, 16)
         self.main_text_line_height = self.main_text_font.getmetrics()[0] + self.main_text_font.getmetrics()[1]
         self.text_cache_image = None
         self.current_render_text = ""
@@ -120,7 +120,7 @@ class RenderThread(threading.Thread):
                     print(f"[Render] Failed to load image {current_image_path}: {e}")
         else:
             current_image = None
-            header_height = 88 + 10  # header + margin
+            header_height = 72 + 8  # header + margin (smaller fonts)
             # create a black background image for header
             image = Image.new("RGBA", (self.whisplay.LCD_WIDTH, header_height), (0, 0, 0, 255))
             draw = ImageDraw.Draw(image)
@@ -170,8 +170,12 @@ class RenderThread(threading.Thread):
         """Render main text content, wrap lines according to screen width, only display currently visible part"""
         if not text:
             return
+        # Show controls guide on idle screen
+        if text in ("Long Press the button to say something.",
+                     "Long Press the button to say something,\ndouble click to launch camera."):
+            text = "Hold button — talk\nRelease  — send\n\n3x tap — silent mode"
         # Use main text font
-        font = ImageFont.truetype(self.font_path, 20)
+        font = ImageFont.truetype(self.font_path, 16)
         lines = TextUtils.wrap_text(draw, text, font, self.whisplay.LCD_WIDTH - 20)
 
         # Line height
