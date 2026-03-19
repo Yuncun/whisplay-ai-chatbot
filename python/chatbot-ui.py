@@ -485,6 +485,12 @@ def on_button_release():
             print(f"[Mode] Switched to: {_current_mode}")
             toggle_notification = {"event": "guest_mode_toggle", "mode": _current_mode}
             send_to_all_clients(toggle_notification)
+            # Write mode flag file for external animation player
+            try:
+                with open("/tmp/whisplay-mode", "w") as f:
+                    f.write(_current_mode)
+            except Exception:
+                pass
             threading.Thread(target=_blink_mode_led, args=(_current_mode,), daemon=True).start()
 
 def _blink_mode_led(mode):
