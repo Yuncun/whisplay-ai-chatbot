@@ -38,6 +38,7 @@ export enum LLMServer {
   qwen = "qwen",
   llm8850 = "llm8850",
   whisplayim = "whisplay-im",
+  openclaw = "openclaw",
   imagetooldirect = "image-tool-direct",
   perplexity = "perplexity",
 }
