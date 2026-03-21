@@ -673,6 +673,15 @@ def handle_client(client_socket, addr, whisplay):
                     trigger_camera_capture = content.get("camera_capture", None)
                     # boolean to enable camera mode
                     set_camera_mode = content.get("camera_mode", None)
+                    set_mode = content.get("set_mode", None)
+
+                    # Remote mode switch (e.g. from Diane via SSH)
+                    if set_mode and set_mode in ("claudia", "claudiugh", "helen"):
+                        global _current_mode
+                        _current_mode = set_mode
+                        print(f"[Mode] Remote switch to: {_current_mode}")
+                        toggle_notification = {"event": "guest_mode_toggle", "mode": _current_mode}
+                        send_to_all_clients(toggle_notification)
 
                     if rgbled:
                         rgb255_tuple = ColorUtils.get_rgb255_from_any(rgbled)
