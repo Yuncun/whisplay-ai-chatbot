@@ -3,9 +3,11 @@ import {
   getRecordFileDurationMs,
   splitSentences,
 } from "./../utils/index";
-import { display } from "../device/display";
+import { display, onGuestModeToggle } from "../device/display";
 import { recognizeAudio, ttsProcessor } from "../cloud-api/server";
 import { isImMode } from "../cloud-api/llm";
+import { setOpenClawMode } from "../cloud-api/openclaw/openclaw-llm";
+import { setTTSInstructions } from "../cloud-api/openai/openai-tts";
 import { DEFAULT_EMOJI, extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
 import { recordingsDir } from "../utils/dir";
@@ -99,6 +101,9 @@ class ChatFlow implements ChatFlowContext {
       this.enableCamera = true;
     }
 
+    // Wire up mode switching from Python-side events (future use)
+    onGuestModeToggle((mode: string) => this.handleModeSwitch(mode));
+
     this.transitionTo("sleep");
 
     const wakeEnabled = (process.env.WAKE_WORD_ENABLED || "").toLowerCase();
@@ -164,6 +169,9 @@ class ChatFlow implements ChatFlowContext {
           display(displayPayload);
         },
       );
+      this.whisplayIMBridge.on("mode", (mode: string) => {
+        this.handleModeSwitch(mode);
+      });
       this.whisplayIMBridge.start();
     }
   }
@@ -194,6 +202,47 @@ class ChatFlow implements ChatFlowContext {
       });
     }
     this.partialThinking = remaining;
+  };
+
+  handleModeSwitch = (mode: string): void => {
+    const validModes = ["claudia", "claudiugh", "helen"];
+    if (!validModes.includes(mode)) {
+      console.log(`[Mode] Invalid mode: ${mode}, ignoring`);
+      return;
+    }
+    if (mode === this.currentMode) {
+      console.log(`[Mode] Already in ${mode}, ignoring`);
+      return;
+    }
+    console.log(`[Mode] Switching from ${this.currentMode} to ${mode}`);
+    this.currentMode = mode;
+
+    // Update OpenClaw user field
+    setOpenClawMode(mode);
+
+    // Update TTS voice/instructions per mode
+    if (mode === "claudiugh") {
+      setTTSInstructions(
+        "Speak in a valley girl style. Be sassy, dramatic, and use vocal fry.",
+        "shimmer",
+      );
+    } else {
+      setTTSInstructions("");
+    }
+
+    // Mute TTS for helen mode
+    this.streamResponser.muted = mode === "helen";
+
+    // Update display
+    const modeEmojis: Record<string, string> = {
+      claudia: "😴",
+      claudiugh: "😈",
+      helen: "👻",
+    };
+    display({
+      status: mode === "claudia" ? "idle" : mode,
+      emoji: modeEmojis[mode] || "😴",
+    });
   };
 
   transitionTo = (flowName: FlowName): void => {
