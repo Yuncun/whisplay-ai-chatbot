@@ -32,6 +32,7 @@ export class WhisplayIMBridgeServer extends EventEmitter {
   private pollPath: string;
   private sendPath: string;
   private statusPath: string;
+  private modePath: string;
   private queue: WhisplayIMPayload[] = [];
   private pending: PendingPoll[] = [];
 
@@ -42,6 +43,7 @@ export class WhisplayIMBridgeServer extends EventEmitter {
     this.pollPath = process.env.WHISPLAY_IM_POLL_PATH || "/whisplay-im/poll";
     this.sendPath = process.env.WHISPLAY_IM_SEND_PATH || "/whisplay-im/send";
     this.statusPath = process.env.WHISPLAY_IM_STATUS_PATH || "/whisplay-im/status";
+    this.modePath = process.env.WHISPLAY_IM_MODE_PATH || "/whisplay-im/mode";
     this.token = process.env.WHISPLAY_IM_TOKEN || "";
   }
 
@@ -133,6 +135,18 @@ export class WhisplayIMBridgeServer extends EventEmitter {
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify({ ok: true }));
+            return;
+          }
+
+          if (pathname === this.modePath) {
+            const mode = (payload as any).mode || "";
+            if (mode) {
+              console.log(`[WhisplayIM] Mode switch request: ${mode}`);
+              this.emit("mode", mode);
+            }
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ ok: true, mode }));
             return;
           }
 
