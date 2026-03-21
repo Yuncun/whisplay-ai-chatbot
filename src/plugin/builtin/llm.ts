@@ -209,6 +209,21 @@ export function registerLLMPlugins(): void {
   } as LLMPlugin);
 
   pluginRegistry.register({
+    name: "openclaw-ws",
+    displayName: "OpenClaw Gateway (WebSocket)",
+    version: "1.0.0",
+    type: "llm",
+    description: "Persistent WebSocket connection to OpenClaw gateway",
+    activate: () => {
+      const mod = require("../../cloud-api/openclaw/openclaw-ws").default;
+      return {
+        chatWithLLMStream: mod.chatWithLLMStream,
+        resetChatHistory: mod.resetChatHistory,
+      };
+    },
+  } as LLMPlugin);
+
+  pluginRegistry.register({
     name: "image-tool-direct",
     displayName: "Image Tool Direct LLM",
     version: "1.0.0",
