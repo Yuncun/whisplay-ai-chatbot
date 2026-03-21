@@ -43,4 +43,10 @@ sudo systemctl restart chatbot
 Keep changes minimal and upstream-compatible. Current diffs:
 - `src/device/audio.ts` — SIGKILL fallback for sox process kill
 - `src/core/chat-flow/states.ts` — .catch() on ASR Promise.race
-- `python/chatbot-ui.py` — VERSION overlay
+- `src/core/StreamResponsor.ts` — muted flag for helen mode (text-only, no TTS)
+- `src/device/display.ts` — guest_mode_toggle event handler + onGuestModeToggle export
+- `src/core/chat-flow/types.ts` + `src/core/ChatFlow.ts` — currentMode on context
+- `src/cloud-api/openai/openai-tts.ts` — setTTSInstructions, voice override, gpt-4o-mini-tts support
+- `src/cloud-api/openclaw/` — OpenClaw LLM plugin, session persistence (`user` field), setOpenClawMode
+- `python/chatbot-ui.py` — VERSION overlay, mode label display, StorymodePlayer POC
+- `.env` — API keys, OpenClaw mode config

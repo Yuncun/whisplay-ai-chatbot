@@ -8,6 +8,13 @@ dotenv.config();
 const openAiVoiceModel = process.env.OPENAI_VOICE_MODEL || "tts-1"; // Default to tts-1
 const openAiVoiceType = process.env.OPENAI_VOICE_TYPE || "nova"; // Optional: alloy, echo, fable, onyx, nova, shimmer
 
+let currentTTSInstructions = "";
+let currentTTSVoiceOverride = "";
+export const setTTSInstructions = (instructions: string, voiceOverride?: string): void => {
+  currentTTSInstructions = instructions;
+  currentTTSVoiceOverride = voiceOverride || "";
+};
+
 const openaiTTS = async (
   text: string
 ): Promise<TTSResult> => {
@@ -15,11 +22,17 @@ const openaiTTS = async (
     console.error("OpenAI API key is not set.");
     return { duration: 0 };
   }
-  const mp3 = await openai.audio.speech.create({
-    model: openAiVoiceModel,
-    voice: openAiVoiceType,
+  // Use gpt-4o-mini-tts when instructions are set (supports voice instructions)
+  const model = currentTTSInstructions ? "gpt-4o-mini-tts" : openAiVoiceModel;
+  const params: Record<string, any> = {
+    model,
+    voice: currentTTSVoiceOverride || openAiVoiceType,
     input: text,
-  }).catch((error) => {
+  };
+  if (currentTTSInstructions) {
+    params.instructions = currentTTSInstructions;
+  }
+  const mp3 = await openai.audio.speech.create(params as any).catch((error) => {
     console.log("OpenAI TTS failed:", error);
     return null;
   });

@@ -7,7 +7,6 @@ import {
   display,
   getCurrentStatus,
   onCameraCapture,
-  onGuestModeToggle,
 } from "../../device/display";
 import {
   recordAudio,
@@ -55,21 +54,9 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
         ctx.transitionTo("camera");
       });
     }
-    const modeEmojis: Record<string, string> = {
-      claudia: "😴",
-      claudiugh: "😈",
-      helen: "👻",
-    };
-    onGuestModeToggle((mode: string) => {
-      ctx.currentMode = mode;
-      display({
-        status: mode,
-        emoji: modeEmojis[mode] || "😴",
-      });
-    });
     display({
-      status: ctx.currentMode !== "claudia" ? ctx.currentMode : "idle",
-      emoji: modeEmojis[ctx.currentMode] || "😴",
+      status: "idle",
+      emoji: "😴",
       RGB: "#000055",
       rag_icon_visible: false,
       ...(getCurrentStatus().text.endsWith("Listening...") || !getCurrentStatus().text
@@ -274,7 +261,6 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
     } = ctx.streamResponser;
     ctx.partialThinking = "";
     ctx.thinkingSentences = [];
-    ctx.streamResponser.muted = ctx.currentMode === "helen";
     [() => Promise.resolve().then(() => ""), getSystemPromptWithKnowledge]
     [enableRAG ? 1 : 0](ctx.asrText)
       .then((res: string) => {
@@ -298,13 +284,6 @@ export const flowStates: Record<FlowName, FlowStateHandler> = {
           role: "system" | "user";
           content: string;
         }[] = compact([
-          ctx.currentMode === "claudiugh"
-            ? {
-              role: "system",
-              content:
-                "[GUEST MODE] Eric's friends are present. Roast Eric mercilessly. Be charming to the guests. Stay in character.",
-            }
-            : null,
           knowledgePrompt
             ? {
               role: "system",

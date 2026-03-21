@@ -7,7 +7,7 @@ import sys
 import threading
 import signal
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 
 # from whisplay import WhisplayBoard
 from whisplay import WhisplayBoard
@@ -62,17 +62,8 @@ storymode_active = False
 _storymode_thread = None
 STORYMODE_SPRITES_DIR = "/home/pi/sprites/elf-girl-graph"
 
-# Quad-tap mode cycling
-_tap_times = []
-_last_press_time = 0
+# Current mode (set by OpenClaw, not device buttons)
 _current_mode = "claudia"
-_alt_modes = ["claudiugh", "helen"]
-_alt_index = 0
-_mode_led_colors = {
-    "claudia": (0, 255, 0),
-    "claudiugh": (255, 0, 0),
-    "helen": (255, 0, 255),
-}
 
 
 import random as _random
@@ -633,50 +624,15 @@ def exit_camera_mode():
 
 def on_button_pressed():
     """Function executed when button is pressed"""
-    global _last_press_time
-    _last_press_time = time.time()
     print("[Server] Button pressed")
     notification = {"event": "button_pressed"}
     send_to_all_clients(notification)
 
 def on_button_release():
     """Function executed when button is released"""
-    global _last_press_time, _tap_times, _current_mode, _alt_index
-    press_duration = time.time() - _last_press_time if _last_press_time > 0 else float('inf')
     print("[Server] Button released")
     notification = {"event": "button_released"}
     send_to_all_clients(notification)
-
-    # Quad-tap detection: 4 short presses (<400ms each) within 1.2s
-    if press_duration < 0.4:
-        now = time.time()
-        _tap_times = [t for t in _tap_times if now - t < 1.2]
-        _tap_times.append(now)
-        if len(_tap_times) >= 4:
-            _tap_times = []
-            if _current_mode == "claudia":
-                _current_mode = _alt_modes[_alt_index]
-                _alt_index = (_alt_index + 1) % len(_alt_modes)
-            else:
-                _current_mode = "claudia"
-            print(f"[Mode] Switched to: {_current_mode}")
-            toggle_notification = {"event": "guest_mode_toggle", "mode": _current_mode}
-            send_to_all_clients(toggle_notification)
-            # Storymode: helen mode starts animation, anything else stops it
-            if _current_mode == "helen":
-                _start_storymode()
-            else:
-                _stop_storymode()
-            threading.Thread(target=_blink_mode_led, args=(_current_mode,), daemon=True).start()
-
-def _blink_mode_led(mode):
-    """Blink LED 3x in mode color"""
-    color = _mode_led_colors.get(mode, (255, 255, 255))
-    for _ in range(3):
-        whisplay.set_rgb_fade(*color, duration_ms=100)
-        time.sleep(0.2)
-        whisplay.set_rgb_fade(0, 0, 0, duration_ms=100)
-        time.sleep(0.2)
 
 def handle_client(client_socket, addr, whisplay):
     global camera_capture_image_path, camera_mode, camera_thread
