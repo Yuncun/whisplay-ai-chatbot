@@ -21,6 +21,11 @@ const baseUrl = process.env.OPENCLAW_BASE_URL || "http://localhost:18789";
 const token = process.env.OPENCLAW_TOKEN || "";
 const agentId = process.env.OPENCLAW_AGENT_ID || "claudia";
 
+let currentMode = "claudia";
+export const setOpenClawMode = (mode: string): void => {
+  currentMode = mode;
+};
+
 const chatWithLLMStream: ChatWithLLMStreamFunction = async (
   inputMessages: Message[] = [],
   partialCallback: (partialAnswer: string) => void,
@@ -36,10 +41,12 @@ const chatWithLLMStream: ChatWithLLMStreamFunction = async (
     content: m.content,
   }));
 
+  const user = currentMode === "claudiugh" ? "whisplay-guest" : "whisplay";
   const body = JSON.stringify({
     model: "openclaw",
     stream: true,
     messages,
+    user,
   });
 
   console.log(`[OpenClaw] POST ${url} (stream=true, agent=${agentId})`);
