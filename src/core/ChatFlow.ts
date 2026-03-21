@@ -7,6 +7,7 @@ import { display, onGuestModeToggle } from "../device/display";
 import { recognizeAudio, ttsProcessor } from "../cloud-api/server";
 import { isImMode } from "../cloud-api/llm";
 import { setOpenClawMode } from "../cloud-api/openclaw/openclaw-llm";
+import { setOpenClawMode as setOpenClawModeWS } from "../cloud-api/openclaw/openclaw-ws";
 import { setTTSInstructions } from "../cloud-api/openai/openai-tts";
 import { DEFAULT_EMOJI, extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
@@ -220,8 +221,9 @@ class ChatFlow implements ChatFlowContext {
     console.log(`[Mode] Switching from ${this.currentMode} to ${mode}`);
     this.currentMode = mode;
 
-    // Update OpenClaw user field
+    // Update OpenClaw mode (both transports — inactive one is a no-op)
     setOpenClawMode(mode);
+    setOpenClawModeWS(mode);
 
     // Update TTS voice/instructions per mode
     if (mode === "claudiugh") {
