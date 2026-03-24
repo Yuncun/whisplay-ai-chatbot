@@ -493,7 +493,8 @@ const agentVoiceMap: Record<string, { voice: string; instructions?: string; spee
   },
   claudia: {
     voice: "nova",
-    speed: 1.15,
+    speed: 1.1,
+    instructions: "You are a French woman speaking English. Strong French accent. Pronounce th as z. Drop h sounds. Breathy and Parisian, like Lea Seydoux speaking English in an interview.",
   },
 };
 
