@@ -181,6 +181,13 @@ function handleMessage(raw: string): void {
     if (msg.event === "agent" && agentEventHandler) {
       agentEventHandler(msg.payload);
     }
+    // Agent switch pushed from gateway (e.g. triggered by another agent)
+    if (msg.event === "agent_switch" && msg.payload) {
+      const { agent, voice, tts_instructions } = msg.payload;
+      if (agent) {
+        switchAgent(agent, voice, tts_instructions);
+      }
+    }
     // tick/health/presence events are keepalives — no action needed
     return;
   }
