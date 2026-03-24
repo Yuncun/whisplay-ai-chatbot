@@ -10,9 +10,11 @@ const openAiVoiceType = process.env.OPENAI_VOICE_TYPE || "nova"; // Optional: al
 
 let currentTTSInstructions = "";
 let currentTTSVoiceOverride = "";
-export const setTTSInstructions = (instructions: string, voiceOverride?: string): void => {
+let currentTTSSpeedOverride = 0; // 0 = use default (1.0)
+export const setTTSInstructions = (instructions: string, voiceOverride?: string, speedOverride?: number): void => {
   currentTTSInstructions = instructions;
   currentTTSVoiceOverride = voiceOverride || "";
+  currentTTSSpeedOverride = speedOverride || 0;
 };
 
 const openaiTTS = async (
@@ -31,6 +33,9 @@ const openaiTTS = async (
   };
   if (currentTTSInstructions) {
     params.instructions = currentTTSInstructions;
+  }
+  if (currentTTSSpeedOverride > 0) {
+    params.speed = currentTTSSpeedOverride;
   }
   const mp3 = await openai.audio.speech.create(params as any).catch((error) => {
     console.log("OpenAI TTS failed:", error);

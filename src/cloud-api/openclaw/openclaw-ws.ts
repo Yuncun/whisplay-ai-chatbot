@@ -486,12 +486,15 @@ export const setOpenClawMode = (mode: string): void => {
  * Uses gpt-4o-mini-tts model (supports instructions param) when
  * instructions are specified, falls back to tts-1 otherwise.
  */
-const agentVoiceMap: Record<string, { voice: string; instructions?: string }> = {
+const agentVoiceMap: Record<string, { voice: string; instructions?: string; speed?: number }> = {
   diane: {
-    voice: "nova",
+    voice: "sage",
     instructions: "Speak with a refined British accent. Dry, understated, sharp wit. Don't overdo it.",
   },
-  // claudia uses the default voice (nova on tts-1) — no entry needed
+  claudia: {
+    voice: "nova",
+    speed: 1.15,
+  },
 };
 
 /**
@@ -517,13 +520,16 @@ export const switchAgent = (agentId: string, voice?: string, instructions?: stri
   const voiceConfig = agentVoiceMap[agentId];
   const finalVoice = voice || voiceConfig?.voice || "";
   const finalInstructions = instructions || voiceConfig?.instructions || "";
-  if (finalVoice || finalInstructions) {
-    setTTSInstructions(finalInstructions, finalVoice);
-  } else {
-    // Reset to default voice (no override, no instructions)
-    setTTSInstructions("");
-  }
+  const finalSpeed = voiceConfig?.speed || 0;
+  setTTSInstructions(finalInstructions, finalVoice, finalSpeed);
 };
+
+// Apply default agent's voice config on startup
+const bootVoiceConfig = agentVoiceMap[defaultAgentId];
+if (bootVoiceConfig) {
+  const { setTTSInstructions: initTTS } = require("../openai/openai-tts");
+  initTTS(bootVoiceConfig.instructions || "", bootVoiceConfig.voice || "", bootVoiceConfig.speed || 0);
+}
 
 export default {
   chatWithLLMStream,
