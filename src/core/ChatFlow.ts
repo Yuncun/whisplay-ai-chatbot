@@ -182,9 +182,9 @@ class ChatFlow implements ChatFlowContext {
           console.log(`[ChatFlow] Agent switch: ${this.currentMode} → ${payload.agent}`);
           switchAgent(payload.agent, payload.voice, payload.ttsInstructions);
           this.currentMode = payload.agent;
-          // Clear display for fresh start with new agent
+          // Clear display and briefly show which agent is now active
           display({
-            text: "",
+            text: `Switched to ${payload.agent}`,
             status: "idle",
             emoji: "😊",
             RGB: "#000055",
