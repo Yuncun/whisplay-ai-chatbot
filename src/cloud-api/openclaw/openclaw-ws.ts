@@ -479,12 +479,28 @@ export const setOpenClawMode = (mode: string): void => {
 };
 
 /**
+ * Per-agent voice configuration. Maps agent IDs to their preferred TTS
+ * voice and speaking style. When switching agents, the TTS automatically
+ * updates to match. Agents not in this map get the default voice.
+ *
+ * Uses gpt-4o-mini-tts model (supports instructions param) when
+ * instructions are specified, falls back to tts-1 otherwise.
+ */
+const agentVoiceMap: Record<string, { voice: string; instructions?: string }> = {
+  diane: {
+    voice: "fable",
+    instructions: "Speak with a refined British accent. Dry, understated, sharp wit. Don't overdo it.",
+  },
+  // claudia uses the default voice (nova on tts-1) — no entry needed
+};
+
+/**
  * Switch the active agent session. Changes which OpenClaw agent the
- * WhisPlay talks to, and optionally updates the TTS voice.
+ * WhisPlay talks to and updates the TTS voice to match.
  *
  * @param agentId   - The agent to switch to (e.g. "diane", "claudia")
- * @param voice     - Optional OpenAI TTS voice name (e.g. "nova", "fable")
- * @param instructions - Optional TTS voice instructions
+ * @param voice     - Optional voice override (takes precedence over agentVoiceMap)
+ * @param instructions - Optional TTS instructions override
  */
 export const switchAgent = (agentId: string, voice?: string, instructions?: string): void => {
   const previousAgent = currentAgentId;
@@ -496,12 +512,15 @@ export const switchAgent = (agentId: string, voice?: string, instructions?: stri
   // Update display label
   display({ mode_label: agentId });
 
-  // Update TTS voice if specified
+  // Update TTS voice: explicit params > agentVoiceMap > default
   const { setTTSInstructions } = require("../openai/openai-tts");
-  if (voice || instructions) {
-    setTTSInstructions(instructions || "", voice);
+  const voiceConfig = agentVoiceMap[agentId];
+  const finalVoice = voice || voiceConfig?.voice || "";
+  const finalInstructions = instructions || voiceConfig?.instructions || "";
+  if (finalVoice || finalInstructions) {
+    setTTSInstructions(finalInstructions, finalVoice);
   } else {
-    // Reset to default voice
+    // Reset to default voice (no override, no instructions)
     setTTSInstructions("");
   }
 };
