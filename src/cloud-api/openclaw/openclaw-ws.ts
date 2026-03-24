@@ -488,7 +488,7 @@ export const setOpenClawMode = (mode: string): void => {
  */
 const agentVoiceMap: Record<string, { voice: string; instructions?: string }> = {
   diane: {
-    voice: "fable",
+    voice: "nova",
     instructions: "Speak with a refined British accent. Dry, understated, sharp wit. Don't overdo it.",
   },
   // claudia uses the default voice (nova on tts-1) — no entry needed
