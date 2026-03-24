@@ -227,45 +227,49 @@ class ChatFlow implements ChatFlowContext {
   };
 
   handleModeSwitch = (mode: string): void => {
-    const validModes = ["claudia", "claudiugh", "helen"];
-    if (!validModes.includes(mode)) {
-      console.log(`[Mode] Invalid mode: ${mode}, ignoring`);
-      return;
-    }
-    if (mode === this.currentMode) {
-      console.log(`[Mode] Already in ${mode}, ignoring`);
+    if (!mode || mode === this.currentMode) {
+      console.log(`[Mode] Already in ${mode || "unknown"}, ignoring`);
       return;
     }
     console.log(`[Mode] Switching from ${this.currentMode} to ${mode}`);
     this.currentMode = mode;
 
-    // Update OpenClaw mode (both transports — inactive one is a no-op)
-    setOpenClawMode(mode);
-    setOpenClawModeWS(mode);
-
-    // Update TTS voice/instructions per mode
-    if (mode === "claudiugh") {
-      setTTSInstructions(
-        "Speak in a valley girl style. Be sassy, dramatic, and use vocal fry.",
-        "shimmer",
-      );
-    } else {
-      setTTSInstructions("");
-    }
-
-    // Mute TTS for helen mode
-    this.streamResponser.muted = mode === "helen";
-
-    // Update display
-    const modeEmojis: Record<string, string> = {
-      claudia: "😴",
-      claudiugh: "😈",
-      helen: "👻",
+    // Known personality modes (same agent, different voice/behavior)
+    const personalityModes: Record<string, { voice?: string; instructions?: string; emoji: string; muted?: boolean }> = {
+      claudiugh: {
+        voice: "shimmer",
+        instructions: "Speak in a valley girl style. Be sassy, dramatic, and use vocal fry.",
+        emoji: "😈",
+      },
+      helen: {
+        emoji: "👻",
+        muted: true,
+      },
     };
-    display({
-      status: mode === "claudia" ? "idle" : mode,
-      emoji: modeEmojis[mode] || "😴",
-    });
+
+    const personality = personalityModes[mode];
+    if (personality) {
+      // Personality switch (same agent session)
+      setOpenClawMode(mode);
+      setOpenClawModeWS(mode);
+      setTTSInstructions(personality.instructions || "", personality.voice);
+      this.streamResponser.muted = personality.muted || false;
+      display({
+        status: mode,
+        emoji: personality.emoji,
+      });
+    } else {
+      // Agent switch (different session + voice)
+      switchAgent(mode);
+      setTTSInstructions("");
+      this.streamResponser.muted = false;
+      display({
+        text: `Switched to ${mode}`,
+        status: "idle",
+        emoji: "😊",
+        RGB: "#000055",
+      });
+    }
   };
 
   transitionTo = (flowName: FlowName): void => {

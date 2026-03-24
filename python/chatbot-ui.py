@@ -676,7 +676,7 @@ def handle_client(client_socket, addr, whisplay):
                     set_mode = content.get("set_mode", None)
 
                     # Remote mode switch (e.g. from Diane via SSH)
-                    if set_mode and set_mode in ("claudia", "claudiugh", "helen"):
+                    if set_mode:
                         global _current_mode
                         _current_mode = set_mode
                         print(f"[Mode] Remote switch to: {_current_mode}")
