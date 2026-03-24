@@ -141,13 +141,19 @@ export class WhisplayIMBridgeServer extends EventEmitter {
 
           if (pathname === this.modePath) {
             const mode = (payload as any).mode || "";
-            if (mode) {
+            const agent = (payload as any).agent || "";
+            const voice = (payload as any).voice || "";
+            const ttsInstructions = (payload as any).tts_instructions || "";
+            if (agent) {
+              console.log(`[WhisplayIM] Agent switch request: ${agent} (voice=${voice || "default"})`);
+              this.emit("agent_switch", { agent, voice, ttsInstructions });
+            } else if (mode) {
               console.log(`[WhisplayIM] Mode switch request: ${mode}`);
               this.emit("mode", mode);
             }
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ ok: true, mode }));
+            res.end(JSON.stringify({ ok: true, mode: mode || agent }));
             return;
           }
 

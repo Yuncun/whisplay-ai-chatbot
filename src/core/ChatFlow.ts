@@ -7,7 +7,7 @@ import { display, onGuestModeToggle } from "../device/display";
 import { recognizeAudio, ttsProcessor } from "../cloud-api/server";
 import { isImMode } from "../cloud-api/llm";
 import { setOpenClawMode } from "../cloud-api/openclaw/openclaw-llm";
-import { setOpenClawMode as setOpenClawModeWS } from "../cloud-api/openclaw/openclaw-ws";
+import { setOpenClawMode as setOpenClawModeWS, switchAgent } from "../cloud-api/openclaw/openclaw-ws";
 import { setTTSInstructions } from "../cloud-api/openai/openai-tts";
 import { DEFAULT_EMOJI, extractEmojis } from "../utils";
 import { StreamResponser } from "./StreamResponsor";
@@ -179,6 +179,21 @@ class ChatFlow implements ChatFlowContext {
       this.whisplayIMBridge.on("mode", (mode: string) => {
         this.handleModeSwitch(mode);
       });
+      this.whisplayIMBridge.on(
+        "agent_switch",
+        (payload: { agent: string; voice?: string; ttsInstructions?: string }) => {
+          console.log(`[ChatFlow] Agent switch: ${this.currentMode} → ${payload.agent}`);
+          switchAgent(payload.agent, payload.voice, payload.ttsInstructions);
+          this.currentMode = payload.agent;
+          // Clear display for fresh start with new agent
+          display({
+            text: "",
+            status: "idle",
+            emoji: "😊",
+            RGB: "#000055",
+          });
+        },
+      );
       this.whisplayIMBridge.start();
     }
   }

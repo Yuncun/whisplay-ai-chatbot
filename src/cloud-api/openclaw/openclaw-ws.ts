@@ -33,8 +33,9 @@ dotEnv.config();
 const baseUrl = process.env.OPENCLAW_BASE_URL || "http://localhost:18789";
 const wsUrl = baseUrl.replace(/^http/, "ws");
 const token = process.env.OPENCLAW_TOKEN || "";
-const agentId = process.env.OPENCLAW_AGENT_ID || "claudia";
-const sessionKey = `agent:${agentId}:main`;
+const defaultAgentId = process.env.OPENCLAW_AGENT_ID || "claudia";
+let currentAgentId = defaultAgentId;
+let sessionKey = `agent:${currentAgentId}:main`;
 const responseTimeoutMs = parseInt(process.env.OPENCLAW_RESPONSE_TIMEOUT_MS || "120000", 10);
 
 // ── Connection liveness detection ───────────────────────────────────────
@@ -460,7 +461,7 @@ export let currentMode = "claudia";
 export const setOpenClawMode = (mode: string): void => {
   currentMode = mode;
   display({ mode_label: mode });
-  if (mode !== "claudia" && connected) {
+  if (mode !== defaultAgentId && connected) {
     sendRequest("chat.inject", {
       sessionKey,
       message: `[MODE SWITCH] Active mode: ${mode}`,
@@ -470,7 +471,36 @@ export const setOpenClawMode = (mode: string): void => {
   }
 };
 
+/**
+ * Switch the active agent session. Changes which OpenClaw agent the
+ * WhisPlay talks to, and optionally updates the TTS voice.
+ *
+ * @param agentId   - The agent to switch to (e.g. "diane", "claudia")
+ * @param voice     - Optional OpenAI TTS voice name (e.g. "nova", "fable")
+ * @param instructions - Optional TTS voice instructions
+ */
+export const switchAgent = (agentId: string, voice?: string, instructions?: string): void => {
+  const previousAgent = currentAgentId;
+  currentAgentId = agentId;
+  sessionKey = `agent:${agentId}:main`;
+  currentMode = agentId;
+  console.log(`[OpenClaw-WS] Agent switch: ${previousAgent} → ${agentId} (session=${sessionKey})`);
+
+  // Update display label
+  display({ mode_label: agentId });
+
+  // Update TTS voice if specified
+  const { setTTSInstructions } = require("../openai/openai-tts");
+  if (voice || instructions) {
+    setTTSInstructions(instructions || "", voice);
+  } else {
+    // Reset to default voice
+    setTTSInstructions("");
+  }
+};
+
 export default {
   chatWithLLMStream,
   resetChatHistory,
+  switchAgent,
 };
