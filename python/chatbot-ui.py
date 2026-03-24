@@ -64,6 +64,7 @@ STORYMODE_SPRITES_DIR = "/home/pi/sprites/elf-girl-graph"
 
 # Current mode (set by OpenClaw, not device buttons)
 _current_mode = "claudia"
+_gateway_connected = False
 
 
 import random as _random
@@ -324,8 +325,15 @@ class RenderThread(threading.Thread):
             ver_font = ImageFont.truetype(self.font_path, 10)
             ver_w = ver_font.getlength(VERSION)
             text_draw.text((self.whisplay.LCD_WIDTH - ver_w - whisplay.CornerHeight - 2, text_area_height - whisplay.CornerHeight - 2), VERSION, font=ver_font, fill=(50, 50, 50, 255))
-            # Mode name (bottom-left)
-            text_draw.text((whisplay.CornerHeight + 2, text_area_height - whisplay.CornerHeight - 2), _current_mode, font=ver_font, fill=(80, 80, 80, 255))
+            # Mode name + connection indicator (bottom-left)
+            conn_dot = "\u25cf " if _gateway_connected else "\u25cb "
+            conn_color = (0, 180, 0, 255) if _gateway_connected else (180, 0, 0, 255)
+            dot_font = ImageFont.truetype(self.font_path, 10)
+            dot_w = dot_font.getlength(conn_dot)
+            label_y = text_area_height - whisplay.CornerHeight - 2
+            label_x = whisplay.CornerHeight + 2
+            text_draw.text((label_x, label_y), conn_dot, font=dot_font, fill=conn_color)
+            text_draw.text((label_x + int(dot_w), label_y), _current_mode, font=ver_font, fill=(80, 80, 80, 255))
             self.whisplay.draw_image(0, header_height, self.whisplay.LCD_WIDTH, text_area_height, ImageUtils.image_to_rgb565(text_bg_image, self.whisplay.LCD_WIDTH, text_area_height))
 
         
@@ -515,7 +523,8 @@ class RenderThread(threading.Thread):
 
 def update_display_data(status=None, emoji=None, text=None,
                   scroll_speed=None, scroll_sync=None, battery_level=None, battery_color=None, image_path=None,
-                  network_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None):
+                  network_connected=None, rag_icon_visible=None, image_icon_visible=None, transaction_id=None,
+                  mode_label=None, gateway_connected=None):
     global current_status, current_emoji, current_text, current_battery_level
     global current_battery_color, current_scroll_top, current_scroll_speed, current_image_path
     global current_scroll_sync_char_end, current_scroll_sync_duration_ms
@@ -595,6 +604,12 @@ def update_display_data(status=None, emoji=None, text=None,
     if image_path is not None and image_path != current_image_path:
         current_image = None  # Force reload when path changes (enables animation)
     current_image_path = image_path if image_path is not None else current_image_path
+    if mode_label is not None:
+        global _current_mode
+        _current_mode = mode_label
+    if gateway_connected is not None:
+        global _gateway_connected
+        _gateway_connected = gateway_connected
 
 
 def send_to_all_clients(message):
@@ -669,6 +684,8 @@ def handle_client(client_socket, addr, whisplay):
                     network_connected = content.get("network_connected", None)
                     rag_icon_visible = content.get("rag_icon_visible", None)
                     image_icon_visible = content.get("image_icon_visible", None)
+                    mode_label = content.get("mode_label", None)
+                    gateway_connected = content.get("gateway_connected", None)
                     capture_image_path = content.get("capture_image_path", None)
                     trigger_camera_capture = content.get("camera_capture", None)
                     # boolean to enable camera mode
@@ -721,14 +738,17 @@ def handle_client(client_socket, addr, whisplay):
                     if (text is not None) or (status is not None) or (emoji is not None) or \
                        (battery_level is not None) or (battery_color is not None) or \
                               (image_path is not None) or (network_connected is not None) or \
-                            (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None):
+                            (rag_icon_visible is not None) or (image_icon_visible is not None) or (scroll_sync is not None) or \
+                            (mode_label is not None) or (gateway_connected is not None):
                         update_display_data(status=status, emoji=emoji,
                                      text=text, scroll_speed=scroll_speed, scroll_sync=scroll_sync,
                                      battery_level=battery_level, battery_color=battery_tuple,
                                                  image_path=image_path, network_connected=network_connected,
                                                  rag_icon_visible=rag_icon_visible,
                                          image_icon_visible=image_icon_visible,
-                                                 transaction_id=transaction_id)
+                                                 transaction_id=transaction_id,
+                                                 mode_label=mode_label,
+                                                 gateway_connected=gateway_connected)
 
                     client_socket.send(b"OK\n")
                     if response_to_client:
