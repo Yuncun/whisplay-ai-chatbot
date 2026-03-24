@@ -320,13 +320,29 @@ gantt
     Play sentence 3        :c3, 8, 11
 ```
 
-## Mode Switching
+## Mode Switching & Agent Label
 
-WhisPlay supports runtime personality switching without restart. The current mode is tracked in `ChatFlow.currentMode` and propagated to both the OpenClaw transport (via `setOpenClawMode()`) and the TTS voice settings.
+WhisPlay supports runtime personality/agent switching without restart. The current mode is tracked in `ChatFlow.currentMode` and propagated to both the OpenClaw transport (via `setOpenClawMode()`) and the TTS voice settings.
 
-Mode can be triggered via the IM bridge `/whisplay-im/mode` endpoint or from the display hardware's guest-mode toggle.
+Mode can be triggered via:
+- The display hardware's guest-mode toggle (quad-tap)
+- The IM bridge `/whisplay-im/mode` endpoint
+- The IM bridge `/whisplay-im/status` endpoint (via `mode_label` field)
 
 When switching to a non-default mode, the WS transport injects a system prompt via `chat.inject` to alter the agent's behavior for the session.
+
+### Persistent Status Bar
+
+The display maintains two persistent fields that survive status transitions (listening → answering → idle etc.):
+
+| Field | Purpose | Set by |
+|---|---|---|
+| `mode_label` | Agent name or mode label shown in the status bar (e.g. "claudia", "guest mode") | Startup (from `OPENCLAW_AGENT_ID` or `WHISPLAY_MODE_LABEL` env), mode switch, or gateway push via `/whisplay-im/status` |
+| `gateway_connected` | Whether the LLM gateway WebSocket is active (for visual connection indicator) | `openclaw-ws.ts` on connect/disconnect |
+
+These fields are forwarded to both the hardware display (Python HAT renderer) and the web display (WebSocket to browser).
+
+**Multi-agent use case:** When switching between different agents (e.g. swapping `OPENCLAW_AGENT_ID` at runtime or routing to different gateway sessions), `mode_label` gives the user a persistent visual indicator of which agent they're currently talking to — useful for setups where a single WhisPlay device can be pointed at multiple AI personas.
 
 ## Configuration (.env)
 
@@ -348,6 +364,9 @@ OPENCLAW_AGENT_ID=<agent-name>
 
 # Response timeout in ms (default: 120000 = 2 min)
 # OPENCLAW_RESPONSE_TIMEOUT_MS=120000
+
+# Display label override (defaults to OPENCLAW_AGENT_ID if not set)
+# WHISPLAY_MODE_LABEL=my-agent
 
 # ASR/TTS (independent of LLM transport)
 ASR_SERVER=openai
