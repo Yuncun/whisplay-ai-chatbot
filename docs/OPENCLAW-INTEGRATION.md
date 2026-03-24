@@ -149,6 +149,34 @@ When the agent is responding, the gateway pushes `event` frames with `event: "ag
 
 **Reconnection:** Exponential backoff starting at 1s, capped at 30s. Auth errors (close code 1008) halt reconnection to avoid loops.
 
+**Connection liveness detection:**
+
+The gateway sends periodic application-level events (`tick`, `health`, `presence`) as keepalives. The client tracks when it last received *any* message. If no messages arrive for a configurable period (default 60s), the client sends a WebSocket-level `ping` frame as a probe. If the `pong` reply doesn't arrive within a deadline (default 10s), the connection is declared dead and torn down to trigger reconnection.
+
+This catches the "silent drop" scenario — most commonly when the device is connected to a mobile hotspot that loses cellular signal. The WiFi link stays up, the TCP socket looks open, but nothing gets through. Without liveness detection, the device would show "connected" indefinitely while being unable to reach the gateway.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Healthy: Messages flowing
+
+    Healthy --> Healthy: Any message received<br/>(reset timer)
+    Healthy --> Stale: No messages for 60s
+
+    Stale --> PingProbe: Send WS ping frame
+    PingProbe --> Healthy: Pong received<br/>(reset timer)
+    PingProbe --> Dead: No pong for 10s
+
+    Dead --> Reconnecting: Close socket
+    Reconnecting --> Healthy: Reconnect succeeds<br/>(gateway_connected = true)
+    Reconnecting --> Reconnecting: Backoff retry
+
+    note right of Stale
+        Common cause: mobile hotspot
+        lost cellular signal but
+        WiFi link still up
+    end note
+```
+
 ### `openclaw` — HTTP/SSE (stateless fallback)
 
 **File:** `src/cloud-api/openclaw/openclaw-llm.ts`
@@ -364,6 +392,11 @@ OPENCLAW_AGENT_ID=<agent-name>
 
 # Response timeout in ms (default: 120000 = 2 min)
 # OPENCLAW_RESPONSE_TIMEOUT_MS=120000
+
+# Liveness detection: silence before sending a ping probe (default: 60s)
+# OPENCLAW_STALE_TIMEOUT_MS=60000
+# Liveness detection: max wait for pong reply before declaring dead (default: 10s)
+# OPENCLAW_PONG_TIMEOUT_MS=10000
 
 # Display label override (defaults to OPENCLAW_AGENT_ID if not set)
 # WHISPLAY_MODE_LABEL=my-agent

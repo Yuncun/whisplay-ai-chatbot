@@ -15,6 +15,8 @@
  *   OPENCLAW_AGENT_ID=claudia
  *   OPENCLAW_DEVICE_IDENTITY_PATH=.whisplay-device.json  (optional, defaults to project root)
  *   OPENCLAW_RESPONSE_TIMEOUT_MS=120000  (optional, default 2 min)
+ *   OPENCLAW_STALE_TIMEOUT_MS=60000  (optional, silence before ping probe, default 60s)
+ *   OPENCLAW_PONG_TIMEOUT_MS=10000  (optional, max wait for pong reply, default 10s)
  */
 
 import WebSocket from "ws";
@@ -34,6 +36,23 @@ const token = process.env.OPENCLAW_TOKEN || "";
 const agentId = process.env.OPENCLAW_AGENT_ID || "claudia";
 const sessionKey = `agent:${agentId}:main`;
 const responseTimeoutMs = parseInt(process.env.OPENCLAW_RESPONSE_TIMEOUT_MS || "120000", 10);
+
+// ── Connection liveness detection ───────────────────────────────────────
+// The gateway sends periodic events (tick, health, presence) as application-
+// level keepalives. We track when we last received *any* message. If silence
+// exceeds STALE_TIMEOUT_MS we send a WebSocket-level ping frame as a probe.
+// If the pong doesn't come back within PONG_TIMEOUT_MS, the connection is
+// truly dead (e.g. phone hotspot lost cellular, Tailscale tunnel stale) and
+// we tear it down to trigger reconnection.
+//
+// This catches the "connected to WiFi but no internet" scenario where the
+// TCP socket looks open but nothing gets through — the most common silent
+// failure when using a mobile hotspot.
+const staleTimeoutMs = parseInt(process.env.OPENCLAW_STALE_TIMEOUT_MS || "60000", 10);
+const pongTimeoutMs = parseInt(process.env.OPENCLAW_PONG_TIMEOUT_MS || "10000", 10);
+let lastMessageAt = 0;
+let stalenessCheckInterval: NodeJS.Timeout | null = null;
+let pongTimer: NodeJS.Timeout | null = null;
 
 // Load device identity for gateway pairing
 const deviceIdentityPath = process.env.OPENCLAW_DEVICE_IDENTITY_PATH
@@ -63,6 +82,50 @@ let responseTimer: NodeJS.Timeout | null = null;
 // Challenge nonce from gateway
 let challengeNonce: string | null = null;
 
+/** Start the periodic staleness check. Called once after successful connect. */
+function startStalenessCheck(): void {
+  stopStalenessCheck();
+  lastMessageAt = Date.now();
+  stalenessCheckInterval = setInterval(() => {
+    if (!connected || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+    const silenceMs = Date.now() - lastMessageAt;
+    if (silenceMs < staleTimeoutMs) return;
+
+    // No messages for staleTimeoutMs — probe with a WS ping
+    if (pongTimer) return; // already waiting for a pong
+    console.log(`[OpenClaw-WS] No messages for ${Math.round(silenceMs / 1000)}s, sending ping probe`);
+    try {
+      ws.ping();
+    } catch {
+      // ping failed — socket is already broken
+      ws?.close();
+      return;
+    }
+
+    // If pong doesn't arrive in time, the connection is dead
+    pongTimer = setTimeout(() => {
+      pongTimer = null;
+      if (connected && ws) {
+        console.warn(`[OpenClaw-WS] Pong timeout after ${pongTimeoutMs}ms — connection dead, closing`);
+        ws.close();
+      }
+    }, pongTimeoutMs);
+  }, 15000); // check every 15s
+}
+
+/** Stop the staleness check and cancel any pending pong timer. */
+function stopStalenessCheck(): void {
+  if (stalenessCheckInterval) {
+    clearInterval(stalenessCheckInterval);
+    stalenessCheckInterval = null;
+  }
+  if (pongTimer) {
+    clearTimeout(pongTimer);
+    pongTimer = null;
+  }
+}
+
 function nextId(): string {
   return String(++requestIdCounter);
 }
@@ -90,6 +153,9 @@ function cleanupAgentHandler(): void {
 }
 
 function handleMessage(raw: string): void {
+  // Any incoming message proves the connection is alive — reset staleness timer
+  lastMessageAt = Date.now();
+
   let msg: any;
   try {
     msg = JSON.parse(raw);
@@ -214,8 +280,20 @@ function doConnect(): Promise<void> {
       console.log("[OpenClaw-WS] Socket open, waiting for connect.challenge");
     });
 
+    // Pong replies to our ping probes — proves the connection is alive
+    ws.on("pong", () => {
+      lastMessageAt = Date.now();
+      if (pongTimer) {
+        clearTimeout(pongTimer);
+        pongTimer = null;
+      }
+    });
+
     ws.on("message", async (data) => {
       const raw = data.toString();
+      // Any incoming data proves liveness (covers challenge + normal messages)
+      lastMessageAt = Date.now();
+
       let msg: any;
       try { msg = JSON.parse(raw); } catch { return; }
 
@@ -230,6 +308,7 @@ function doConnect(): Promise<void> {
           reconnectDelay = 1000;
           console.log("[OpenClaw-WS] Connected successfully (protocol 3, device paired)");
           display({ gateway_connected: true });
+          startStalenessCheck();
           connectResolve();
         } catch (err: any) {
           console.error(`[OpenClaw-WS] Connect frame rejected: ${err.message}`);
@@ -250,6 +329,7 @@ function doConnect(): Promise<void> {
       connected = false;
       connecting = false;
       display({ gateway_connected: false });
+      stopStalenessCheck();
 
       // Clean up any in-flight agent response
       cleanupAgentHandler();
