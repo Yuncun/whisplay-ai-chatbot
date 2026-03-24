@@ -23,6 +23,7 @@ import fs from "fs";
 import path from "path";
 import { Message } from "../../type";
 import { ChatWithLLMStreamFunction } from "../interface";
+import { display } from "../../device/display";
 import dotEnv from "dotenv";
 
 dotEnv.config();
@@ -228,6 +229,7 @@ function doConnect(): Promise<void> {
           connecting = false;
           reconnectDelay = 1000;
           console.log("[OpenClaw-WS] Connected successfully (protocol 3, device paired)");
+          display({ gateway_connected: true });
           connectResolve();
         } catch (err: any) {
           console.error(`[OpenClaw-WS] Connect frame rejected: ${err.message}`);
@@ -247,6 +249,7 @@ function doConnect(): Promise<void> {
       console.log(`[OpenClaw-WS] Closed: ${code} ${reasonStr}`);
       connected = false;
       connecting = false;
+      display({ gateway_connected: false });
 
       // Clean up any in-flight agent response
       cleanupAgentHandler();
@@ -376,6 +379,7 @@ const resetChatHistory = (): void => {
 export let currentMode = "claudia";
 export const setOpenClawMode = (mode: string): void => {
   currentMode = mode;
+  display({ mode_label: mode });
   if (mode !== "claudia" && connected) {
     sendRequest("chat.inject", {
       sessionKey,

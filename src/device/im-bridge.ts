@@ -129,8 +129,9 @@ export class WhisplayIMBridgeServer extends EventEmitter {
             const emoji = (payload as any).emoji || "";
             const text = (payload as any).text || "";
             const tool = (payload as any).tool || "";
+            const modeLabel = (payload as any).mode_label || "";
             if (status) {
-              this.emit("status", { status, emoji, text, tool });
+              this.emit("status", { status, emoji, text, tool, modeLabel });
             }
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");

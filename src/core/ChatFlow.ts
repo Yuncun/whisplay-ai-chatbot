@@ -131,7 +131,7 @@ class ChatFlow implements ChatFlowContext {
       );
       this.whisplayIMBridge.on(
         "status",
-        (payload: { status: string; emoji?: string; text?: string; tool?: string }) => {
+        (payload: { status: string; emoji?: string; text?: string; tool?: string; modeLabel?: string }) => {
           const statusText = payload.tool
             ? `[${payload.tool}] ${payload.text || ""}`
             : payload.text || "";
@@ -167,6 +167,9 @@ class ChatFlow implements ChatFlowContext {
             text: statusText,
             RGB: "#ff6800",
           };
+          if (payload.modeLabel) {
+            (displayPayload as any).mode_label = payload.modeLabel;
+          }
           display(displayPayload);
         },
       );

@@ -28,6 +28,10 @@ export interface Status {
   network_connected: boolean;
   rag_icon_visible: boolean;
   image_icon_visible: boolean;
+  /** Persistent label shown in status bar (e.g. agent name or mode). */
+  mode_label: string;
+  /** Whether the LLM gateway connection is active. */
+  gateway_connected: boolean;
 }
 
 export class WhisplayDisplay {
@@ -47,6 +51,8 @@ export class WhisplayDisplay {
     network_connected: false,
     rag_icon_visible: false,
     image_icon_visible: false,
+    mode_label: process.env.OPENCLAW_AGENT_ID || process.env.WHISPLAY_MODE_LABEL || "",
+    gateway_connected: false,
   };
 
   private client = null as Socket | null;
@@ -389,7 +395,13 @@ export class WhisplayDisplay {
     this.currentStatus.network_connected = network_connected;
     this.currentStatus.rag_icon_visible = rag_icon_visible;
     this.currentStatus.image_icon_visible = image_icon_visible;
-    
+    if (normalizedStatus.mode_label !== undefined) {
+      this.currentStatus.mode_label = normalizedStatus.mode_label;
+    }
+    if (normalizedStatus.gateway_connected !== undefined) {
+      this.currentStatus.gateway_connected = normalizedStatus.gateway_connected;
+    }
+
     const changedValuesObj = Object.fromEntries(changedValues);
     changedValuesObj.brightness = 100;
     const data = JSON.stringify(changedValuesObj);
